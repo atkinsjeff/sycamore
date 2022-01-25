@@ -1,0 +1,209 @@
+# make up the work on OSBS 32
+require(tidyverse)
+x <- read.csv("./data/vst_mappingTagging2016_goughSites.csv")
+y <- read.csv( "./data/vst_apparentIndividuals2016_goughSites.csv")
+
+
+
+x %>%
+    select(siteid, plotType, plotid, individualid, taxonid, stemazimuth, stemdistance) %>%
+    filter(siteid == "OSBS" & plotType == "tower" & taxonid != "2PLANT") %>%
+    data.frame() -> mapping
+
+y %>%
+    select(siteid, plotType, plotid, individualid, growthform, stemdiameter, plantstatus) %>%
+    filter(siteid == "OSBS" & plotType == "tower" & stemdiameter < 100) %>%
+    data.frame() -> stems
+
+# merge together
+df <- merge(stems, mapping)
+
+# make basal area
+df$ba <- (df$stemdiameter/2) * pi
+
+# Density (D) and basal area (BA)
+df %>%
+    filter(plantstatus == 1) %>%
+    select(taxonid, ba) %>%
+    group_by(taxonid) %>%
+    summarize(ba_total = sum(ba, na.rm = TRUE),
+              n = n())%>%
+    mutate(D = n/sum(n),
+           BA = ba_total / sum(ba_total)) %>%
+    select(taxonid, D, BA) -> D_BA
+
+
+df %>%
+    group_by(taxonid) %>%
+    summarise(n = n()) %>%
+    mutate(Freq = n/sum(n))
+
+#####
+# ROUNDING FUNCTION
+round.choose <- function(x, roundTo, dir = 1) {
+    if(dir == 1) {  ##ROUND UP
+        x + (roundTo - x %% roundTo)
+    } else {
+        if(dir == 0) {  ##ROUND DOWN
+            x - (x %% roundTo)
+        }
+    }
+}
+
+# make size classes
+df$sizeclass <- round.choose(df$stemdiameter, 10, 0)
+
+# number of size classes
+no.sc <- length(unique(df$sizeclass))
+
+x11()
+hist(df$sizeclass, breaks = 5)
+
+df %>%
+    group_by(taxonid) %>%
+    summarize(SC = (length(unique(sizeclass)) / no.sc)) -> SC
+
+# frequency
+no.plots <- length(unique(df$plotid))
+
+df %>%
+    group_by(taxonid) %>%
+    summarize(F = (length(unique(plotid)) / no.plots)) -> F
+
+
+# bring together
+bob <- merge(D_BA, F)
+bob <- merge(bob, SC)
+
+# make the correct order 
+all <- bob[, c("taxonid", "D", "F", "SC", "BA")]
+names(all)[1] <- "Species"
+
+# test
+x11()
+PIPA <- ggradar(all[1, ], 
+        group.colours = "black",
+        font.radar = "roboto",
+        grid.label.size = 6,  # Affects the grid annotations (0%, 50%, etc.)
+        axis.label.size = 5, # Afftects the names of the variables
+        group.point.size = 1,   # Simply the size of the point 
+        plot.legend = FALSE,
+        axis.line.colour = "black",
+        gridline.max.linetype = "solid", gridline.min.colour = "black",
+        gridline.mid.colour = "black", gridline.max.colour = "black",
+        plot.title = "LONGLEAF PINE"
+)
+
+
+QUGE <- ggradar(all[2, ], 
+                group.colours = "black",
+                font.radar = "roboto",
+                grid.label.size = 6,  # Affects the grid annotations (0%, 50%, etc.)
+                axis.label.size = 5, # Afftects the names of the variables
+                group.point.size = 1,   # Simply the size of the point 
+                plot.legend = FALSE,
+                axis.line.colour = "black",
+                gridline.max.linetype = "solid", gridline.min.colour = "black",
+                gridline.mid.colour = "black", gridline.max.colour = "black",
+                plot.title = "SAND LIVE OAK"
+)
+
+QULA <- ggradar(all[3, ], 
+                group.colours = "black",
+                font.radar = "roboto",
+                grid.label.size = 6,  # Affects the grid annotations (0%, 50%, etc.)
+                axis.label.size = 5, # Afftects the names of the variables
+                group.point.size = 1,   # Simply the size of the point 
+                plot.legend = FALSE,
+                axis.line.colour = "black",
+                gridline.max.linetype = "solid", gridline.min.colour = "black",
+                gridline.mid.colour = "black", gridline.max.colour = "black",
+                plot.title = "TURKEY OAK"
+)
+
+QUMA <- ggradar(all[4, ], 
+                group.colours = "black",
+                font.radar = "roboto",
+                grid.label.size = 6,  # Affects the grid annotations (0%, 50%, etc.)
+                axis.label.size = 5, # Afftects the names of the variables
+                group.point.size = 1,   # Simply the size of the point 
+                plot.legend = FALSE,
+                axis.line.colour = "black",
+                gridline.max.linetype = "solid", gridline.min.colour = "black",
+                gridline.mid.colour = "black", gridline.max.colour = "black",
+                plot.title = "SAND POST OAK"
+)
+
+require(cowplot)
+x11(width = 15, height = 4)
+plot_grid(PIPA, QULA, QUGE, QUMA, labels = NA, align = "h", nrow = 1)
+
+
+
+
+
+#####
+ri <- read.csv("./data/osbs_howard_data.csv")
+
+x11(width = 8, height = 3)
+ggplot(ri, aes(x = x, y = Height, fill = Fill))+
+    geom_segment(aes(x = x, xend = x, y = 0, yend = Height), color="black")+
+    geom_point(size = (ri$Height * 1.2),  shape = ri$Shape)+
+    theme_classic()+
+    scale_fill_manual(values = c("A" = "black",
+                                 "B" = "#696969",
+                                 "C" = "#A9A9A9",
+                                 "D" = "#D3D3D3",
+                                 "E" = "white"))+
+    theme(
+        panel.grid.major.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 16),
+        axis.text.x = element_text(size = 16, color = "black"),
+        legend.position = "none"
+    ) +
+    xlab("") +
+    ylab("Height [m]")+
+    ggtitle("Ordway-Swisher Biological Station")+
+    scale_x_continuous(lim = c(0, 8), breaks=c(0, 1, 4, 6, 7),
+                 labels=c("", "LL", "TO", "SLO", "SPO"))+
+    ylim(c(0, 30))
+    
+    
+    annotate("text", x = 3, y = -1, label = "text") +  
+    theme(plot.margin = unit(c(1, 1, 3, 1), "lines")) +
+    coord_cartesian(clip = "off")
+    geom_text(x = 14.25, # Set the position of the text to always be at '14.25'
+              hjust = 0,
+              size = 8) +
+    coord_cartesian(xlim = c(10, 14), # This focuses the x-axis on the range of interest
+                    clip = 'off') +   # This keeps the labels from disappearing
+    theme(plot.margin = unit(c(1,3,1,1), "lines"))
+    
+    ### making annotations
+    breaks.major <- c(1, 2, 5, 7, 8, 9)
+    breaks.minor <- c(1, 2, 5, 7, 8, 9)
+    labels.minor <- c("", "LL", "TO", "SLO", "SPO", "")
+
+### ART ONE!
+x11(width = 8, height = 3)
+ggplot(ri, aes(x = x, y = Height))+
+    geom_segment(aes(x = x, xend = x, y = 0, yend = Height), color="black")+
+    geom_point(size = (ri$Height * 10), alpha = ri$RI, shape = ri$Shape, fill = "black")+
+    theme_void() +
+    theme(
+        panel.grid.major.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank()
+    ) +
+    xlab("") +
+    ylab("Height [m]")+
+    xlim(c(1, 10))+
+    ylim(c(0, 25))
+
+
+####
+require(ggpattern)
+
