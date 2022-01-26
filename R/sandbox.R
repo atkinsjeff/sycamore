@@ -20,6 +20,7 @@ y %>%
 df <- merge(stems, mapping)
 
 # make basal area
+df$ba <- calc_ba(df$stemdiameter)
 df$ba <- (df$stemdiameter/2) * pi
 
 # Density (D) and basal area (BA)
